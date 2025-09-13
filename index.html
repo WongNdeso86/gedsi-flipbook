@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modul Interaktif Flipbook: Pendidikan Politik GEDSI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.min.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #0056b3;
+            --secondary-color: #28a745;
+            --background-color: #f0f2f5;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--background-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .main-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .header {
+            width: 100%; text-align: center; margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            color: var(--primary-color); margin: 0;
+        }
+
+        .module-nav {
+            display: flex; gap: 10px; margin-bottom: 20px;
+        }
+
+        .module-nav button {
+            background-color: var(--secondary-color);
+            color: white; border: none; padding: 10px 20px; font-size: 1.1em;
+            font-family: 'Poppins', sans-serif; border-radius: 5px; cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .module-nav button:hover {
+            background-color: #218838;
+        }
+        
+        .module-nav button.active {
+            background-color: var(--primary-color);
+            transform: translateY(-3px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        .book-container {
+            width: 90vw; max-width: 900px; height: 60vw; max-height: 636px;
+        }
+        
+        #flipbook {
+            width: 100%; height: 100%;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2); border-radius: 5px;
+        }
+        
+        .page {
+            background-color: white; overflow: hidden;
+        }
+        
+        .page img {
+            width: 100%; height: 100%; object-fit: contain;
+        }
+
+        .page-controls {
+            display: flex; justify-content: center; align-items: center;
+            margin-top: 20px; gap: 15px;
+        }
+        
+        .page-controls button {
+            background-color: var(--primary-color); color: white; border: none;
+            padding: 10px 20px; font-size: 1em; font-family: 'Poppins', sans-serif;
+            border-radius: 5px; cursor: pointer; transition: background-color 0.3s;
+        }
+
+        .page-controls button:hover {
+            background-color: #004494;
+        }
+        
+        #page-counter {
+            font-weight: 600; font-size: 1.1em;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <header class="header">
+            <h1>Modul Pendidikan Politik GEDSI</h1>
+        </header>
+
+        <!-- Navigasi untuk memilih Modul -->
+        <div class="module-nav">
+            <button data-module-index="0">Modul 1</button>
+            <button data-module-index="1">Modul 2</button>
+            <button data-module-index="2">Modul 3</button>
+        </div>
+
+        <!-- Container Flipbook (Konten akan dibuat oleh JavaScript) -->
+        <div class="book-container">
+            <div id="flipbook"></div>
+        </div>
+
+        <!-- Kontrol untuk halaman buku yang sedang aktif -->
+        <div class="page-controls">
+            <button id="prev-btn">‹ Sebelumnya</button>
+            <span id="page-counter"></span>
+            <button id="next-btn">Berikutnya ›</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Konfigurasi untuk setiap modul
+            const modules = [
+                { folder: 'modul1', pageCount: 113 },
+                { folder: 'modul2', pageCount: 51 },
+                { folder: 'modul3', pageCount: 37 }
+            ];
+
+            const flipbookElement = document.getElementById('flipbook');
+            const pageCounter = document.getElementById('page-counter');
+            const navButtons = document.querySelectorAll('.module-nav button');
+            
+            let currentBook = null; // Variabel untuk menyimpan objek buku yang aktif
+
+            function loadModule(moduleIndex) {
+                // 1. Hancurkan instance buku lama jika ada
+                if (currentBook) {
+                    currentBook.destroy();
+                    currentBook = null;
+                }
+
+                // 2. Kosongkan container flipbook
+                flipbookElement.innerHTML = '';
+
+                // 3. Dapatkan data modul yang dipilih
+                const selectedModule = modules[moduleIndex];
+
+                // 4. Buat halaman-halaman buku baru secara dinamis
+                for (let i = 1; i <= selectedModule.pageCount; i++) {
+                    const page = document.createElement('div');
+                    page.classList.add('page');
+                    
+                    const img = document.createElement('img');
+                    img.src = `${selectedModule.folder}/${i}.png`;
+                    img.alt = `Modul ${moduleIndex + 1} - Halaman ${i}`;
+                    // Lazy loading untuk performa lebih baik
+                    img.loading = 'lazy'; 
+                    
+                    page.appendChild(img);
+                    flipbookElement.appendChild(page);
+                }
+
+                // 5. Inisialisasi instance PageFlip baru
+                const book = new St.PageFlip(flipbookElement, {
+                    width: 500, height: 707,
+                    size: 'stretch',
+                    showCover: true // 1.png akan otomatis menjadi sampul
+                });
+                
+                book.loadFromHTML(document.querySelectorAll('.page'));
+                currentBook = book; // Simpan instance buku baru
+
+                // 6. Update UI dan event listener
+                updatePageCounter();
+                book.on('flip', updatePageCounter);
+                
+                // Update tombol navigasi aktif
+                navButtons.forEach(btn => btn.classList.remove('active'));
+                navButtons[moduleIndex].classList.add('active');
+            }
+
+            function updatePageCounter() {
+                if (!currentBook) return;
+                
+                const currentPage = currentBook.getCurrentPageIndex();
+                const totalPages = currentBook.getPageCount();
+                
+                const displayPage = (currentPage === 0) ? `1 (Sampul)` : `${currentPage + 1}`;
+                pageCounter.textContent = `Halaman ${displayPage} / ${totalPages}`;
+            }
+
+            // Event listener untuk tombol navigasi modul
+            navButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const moduleIndex = parseInt(button.dataset.moduleIndex, 10);
+                    loadModule(moduleIndex);
+                });
+            });
+
+            // Event listener untuk kontrol halaman
+            document.getElementById('prev-btn').addEventListener('click', () => {
+                if (currentBook) currentBook.flipPrev();
+            });
+
+            document.getElementById('next-btn').addEventListener('click', () => {
+                if (currentBook) currentBook.flipNext();
+            });
+
+            // Muat modul pertama saat halaman dibuka
+            loadModule(0);
+        });
+    </script>
+</body>
+</html>
