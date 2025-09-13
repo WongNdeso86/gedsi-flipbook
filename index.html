@@ -11,33 +11,38 @@
     <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.min.js"></script>
 
     <style>
-        /* CSS TIDAK BERUBAH DARI SEBELUMNYA, JADI SAYA SINGKAT UNTUK KEJELASAN */
-        :root { --primary-color: #0056b3; --secondary-color: #28a745; --background-color: #f0f2f5; --dark-background: #2c3e50; }
+        :root { --primary-color: #0056b3; --secondary-color: #28a745; --background-color: #f0f2f5; }
         body { font-family: 'Poppins', sans-serif; background-color: var(--background-color); margin: 0; display: flex; flex-direction: column; min-height: 100vh; color: #333; }
         .main-container { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; width: 100%; box-sizing: border-box; }
-        .header { width: 100%; text-align: center; margin-bottom: 20px; }
+        .header { text-align: center; margin-bottom: 20px; }
         .header h1 { color: var(--primary-color); margin: 0; }
         .top-controls { display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
         .module-nav button, #fullscreen-btn { background-color: var(--secondary-color); color: white; border: none; padding: 10px 20px; font-size: 1em; font-family: 'Poppins', sans-serif; border-radius: 5px; cursor: pointer; transition: all 0.3s; }
-        .module-nav button:hover, #fullscreen-btn:hover { background-color: #218838; }
+        .module-nav button:hover, #fullscreen-btn:hover { opacity: 0.8; }
         .module-nav button.active { background-color: var(--primary-color); transform: translateY(-3px); box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
         #fullscreen-btn { background-color: #6c757d; }
-        #fullscreen-btn:hover { background-color: #5a6268; }
-        .book-container { width: 90vw; max-width: 900px; aspect-ratio: 2 / 1.414; max-height: 636px; }
-        #flipbook { width: 100%; height: 100%; box-shadow: 0 4px 20px rgba(0,0,0,0.2); border-radius: 5px; }
+        
+        /* PENTING: Container untuk setiap buku */
+        .book-wrapper { width: 90vw; max-width: 900px; aspect-ratio: 2 / 1.414; max-height: 636px; }
+        .flipbook { width: 100%; height: 100%; box-shadow: 0 4px 20px rgba(0,0,0,0.2); border-radius: 5px; }
         .page { background-color: white; overflow: hidden; }
         .page img { width: 100%; height: 100%; object-fit: contain; }
         .page-controls { display: flex; justify-content: center; align-items: center; margin-top: 20px; gap: 15px; }
-        .page-controls button { background-color: var(--primary-color); color: white; border: none; padding: 10px 20px; font-size: 1em; font-family: 'Poppins', sans-serif; border-radius: 5px; cursor: pointer; transition: background-color 0.3s; }
-        .page-controls button:hover { background-color: #004494; }
+        .page-controls button { background-color: var(--primary-color); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
         #page-counter { font-weight: 600; font-size: 1.1em; }
-        @media (max-width: 768px) { .book-container { width: 95vw; aspect-ratio: 1 / 1.414; max-height: 80vh; } .top-controls { flex-direction: column; } }
-        .main-container:fullscreen { background-color: var(--dark-background); overflow-y: auto; }
-        .main-container:fullscreen .book-container { max-width: 95vw; max-height: 95vh; }
+
+        /* Sembunyikan buku yang tidak aktif */
+        .book-wrapper:not(.active) { display: none; }
+
+        /* STATUS LOG UNTUK DEBUGGING */
+        #status-log { margin-top: 15px; padding: 10px; background-color: #fff; border: 1px solid #ddd; border-radius: 5px; font-size: 0.8em; max-height: 100px; overflow-y: auto; width: 90%; max-width: 900px; }
+        .log-error { color: red; font-weight: bold; }
+        .log-success { color: green; }
+
+        @media (max-width: 768px) { .book-wrapper { width: 95vw; aspect-ratio: 1 / 1.414; max-height: 80vh; } }
     </style>
 </head>
 <body>
-
     <div class="main-container" id="main-container">
         <header class="header"><h1>Modul Pendidikan Politik GEDSI</h1></header>
 
@@ -50,95 +55,106 @@
             <button id="fullscreen-btn">Layar Penuh</button>
         </div>
         
-        <div class="book-container"><div id="flipbook"></div></div>
+        <!-- Tiga container untuk masing-masing buku -->
+        <div id="wrapper-modul-0" class="book-wrapper"></div>
+        <div id="wrapper-modul-1" class="book-wrapper"></div>
+        <div id="wrapper-modul-2" class="book-wrapper"></div>
 
         <div class="page-controls">
             <button id="prev-btn">‹ Sebelumnya</button>
             <span id="page-counter"></span>
             <button id="next-btn">Berikutnya ›</button>
         </div>
+
+        <!-- Status Log akan muncul di sini -->
+        <div id="status-log"></div>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // --- BAGIAN SCRIPT YANG DIPERBAIKI ---
-
             const modules = [
                 { folder: 'modul1', pageCount: 113 },
                 { folder: 'modul2', pageCount: 51 },
                 { folder: 'modul3', pageCount: 37 }
             ];
 
-            const flipbookElement = document.getElementById('flipbook');
-            const pageCounter = document.getElementById('page-counter');
             const navButtons = document.querySelectorAll('.module-nav button');
-            const mainContainer = document.getElementById('main-container');
-            const fullscreenBtn = document.getElementById('fullscreen-btn');
-
+            const pageCounter = document.getElementById('page-counter');
+            const logContainer = document.getElementById('status-log');
+            
+            let bookInstances = [];
             let currentBook = null;
 
-            function loadModule(moduleIndex) {
-                console.log(`[INFO] Memulai memuat modul ${moduleIndex + 1}...`);
+            function updateStatus(message, type = 'info') {
+                const logEntry = document.createElement('div');
+                logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                if (type === 'error') logEntry.classList.add('log-error');
+                if (type === 'success') logEntry.classList.add('log-success');
+                logContainer.appendChild(logEntry);
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
 
-                // Langkah 1: Hancurkan instance buku lama dengan aman
-                if (currentBook && typeof currentBook.destroy === 'function') {
-                    console.log("[INFO] Menghancurkan instance buku sebelumnya.");
-                    currentBook.destroy();
+            function initializeBooks() {
+                updateStatus("Mulai inisialisasi semua modul...");
+
+                modules.forEach((module, index) => {
+                    const wrapper = document.getElementById(`wrapper-modul-${index}`);
+                    const flipbookDiv = document.createElement('div');
+                    flipbookDiv.classList.add('flipbook');
+                    wrapper.appendChild(flipbookDiv);
+
+                    for (let i = 1; i <= module.pageCount; i++) {
+                        const page = document.createElement('div');
+                        page.classList.add('page');
+                        
+                        const img = document.createElement('img');
+                        img.src = `${module.folder}/${i}.png`;
+                        img.alt = `Modul ${index + 1} - Halaman ${i}`;
+                        img.loading = 'lazy';
+                        img.onerror = function() {
+                            updateStatus(`GAGAL MEMUAT GAMBAR: ${this.src}`, 'error');
+                        };
+                        
+                        page.appendChild(img);
+                        flipbookDiv.appendChild(page);
+                    }
+
+                    try {
+                        const book = new St.PageFlip(flipbookDiv, {
+                            width: 500, height: 707, size: 'stretch',
+                            showCover: true, usePortrait: window.innerWidth < 768
+                        });
+                        book.loadFromHTML(flipbookDiv.querySelectorAll('.page'));
+                        bookInstances.push(book);
+                        updateStatus(`Modul ${index + 1} berhasil dibuat.`, 'success');
+                    } catch (e) {
+                        updateStatus(`ERROR saat membuat Modul ${index + 1}: ${e.message}`, 'error');
+                    }
+                });
+            }
+
+            function showModule(moduleIndex) {
+                document.querySelectorAll('.book-wrapper').forEach((wrapper, index) => {
+                    if (index === moduleIndex) {
+                        wrapper.classList.add('active');
+                    } else {
+                        wrapper.classList.remove('active');
+                    }
+                });
+
+                currentBook = bookInstances[moduleIndex];
+                if (!currentBook) {
+                    updateStatus(`Buku untuk modul ${moduleIndex + 1} tidak ditemukan!`, 'error');
+                    return;
                 }
-                currentBook = null;
-
-                // Langkah 2: Kosongkan elemen HTML
-                flipbookElement.innerHTML = '';
-
-                // Langkah 3: Siapkan data modul baru
-                const selectedModule = modules[moduleIndex];
-                if (!selectedModule) {
-                    console.error(`[ERROR] Konfigurasi modul untuk index ${moduleIndex} tidak ditemukan!`);
-                    return; // Hentikan fungsi jika data tidak ada
-                }
-
-                // Langkah 4: Buat halaman-halaman buku baru
-                console.log(`[INFO] Membuat ${selectedModule.pageCount} halaman untuk folder '${selectedModule.folder}'...`);
-                for (let i = 1; i <= selectedModule.pageCount; i++) {
-                    const page = document.createElement('div');
-                    page.classList.add('page');
-                    
-                    const img = document.createElement('img');
-                    img.src = `${selectedModule.folder}/${i}.png`;
-                    img.alt = `Modul ${moduleIndex + 1} - Halaman ${i}`;
-                    img.loading = 'lazy';
-                    // Tambahkan error handling untuk gambar
-                    img.onerror = function() {
-                        console.error(`[ERROR] Gagal memuat gambar: ${this.src}`);
-                        this.alt = `Gagal memuat: ${this.src}`; // Tampilkan pesan error di gambar
-                    };
-                    
-                    page.appendChild(img);
-                    flipbookElement.appendChild(page);
-                }
-
-                // Langkah 5: Inisialisasi PageFlip baru
-                try {
-                    const book = new St.PageFlip(flipbookElement, {
-                        width: 500, height: 707, size: 'stretch',
-                        showCover: true, usePortrait: window.innerWidth < 768, maxShadowOpacity: 0.5 
-                    });
-                    
-                    book.loadFromHTML(document.querySelectorAll('.page'));
-                    currentBook = book;
-                    console.log("[SUCCESS] Buku baru berhasil dibuat dan dimuat!");
-
-                    // Langkah 6: Update UI dan event listener
-                    currentBook.on('flip', updatePageCounter);
-                    updatePageCounter();
-                    
-                    navButtons.forEach(btn => btn.classList.remove('active'));
-                    navButtons[moduleIndex].classList.add('active');
-
-                } catch (e) {
-                    console.error("[FATAL ERROR] Gagal menginisialisasi PageFlip:", e);
-                    flipbookElement.innerHTML = '<p style="color:red; text-align:center;">Gagal memuat buku. Cek Console untuk detail error.</p>';
-                }
+                
+                navButtons.forEach((btn, index) => {
+                    btn.classList.toggle('active', index === moduleIndex);
+                });
+                
+                currentBook.off('flip'); // Hapus listener lama
+                currentBook.on('flip', updatePageCounter); // Tambah listener baru
+                updatePageCounter();
             }
 
             function updatePageCounter() {
@@ -148,29 +164,29 @@
                 const displayPage = (currentPage === 0) ? `1 (Sampul)` : `${currentPage + 1}`;
                 pageCounter.textContent = `Halaman ${displayPage} / ${totalPages}`;
             }
-            
-            function toggleFullscreen() {
-                if (!document.fullscreenElement) {
-                    mainContainer.requestFullscreen().catch(err => {
-                        alert(`Gagal masuk mode layar penuh: ${err.message}`);
-                    });
-                } else { document.exitFullscreen(); }
-            }
 
-            // --- Event Listeners ---
             navButtons.forEach(button => {
-                button.addEventListener('click', (event) => {
-                    const moduleIndex = parseInt(event.currentTarget.dataset.moduleIndex, 10);
-                    loadModule(moduleIndex);
+                button.addEventListener('click', (e) => {
+                    const index = parseInt(e.currentTarget.dataset.moduleIndex, 10);
+                    showModule(index);
                 });
             });
 
             document.getElementById('prev-btn').addEventListener('click', () => currentBook?.flipPrev());
             document.getElementById('next-btn').addEventListener('click', () => currentBook?.flipNext());
-            fullscreenBtn.addEventListener('click', toggleFullscreen);
+            document.getElementById('fullscreen-btn').addEventListener('click', () => {
+                const activeWrapper = document.querySelector('.book-wrapper.active');
+                if (activeWrapper && !document.fullscreenElement) {
+                    activeWrapper.requestFullscreen().catch(err => alert(`Gagal: ${err.message}`));
+                } else { document.exitFullscreen(); }
+            });
 
-            // Muat modul pertama saat halaman dibuka
-            loadModule(0);
+            initializeBooks();
+            if (bookInstances.length > 0) {
+                showModule(0); // Tampilkan modul pertama
+            } else {
+                updateStatus("Tidak ada buku yang berhasil diinisialisasi.", "error");
+            }
         });
     </script>
 </body>
